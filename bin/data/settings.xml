@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<settings>
+    <osc_host>BrazilV.local</osc_host>
+    <osc_port>7110</osc_port>
+    <stream_port>7111</stream_port>
+    <ws_port>7112</ws_port>
+    <!-- * -->
+    <app_framerate>60</app_framerate>
+    <cam_framerate>40</cam_framerate>
+    <width>640</width>
+    <height>480</height>
+    <debug>1</debug>
+    <!-- * -->
+    <rpi_cam_version>2</rpi_cam_version>
+    <still_compression>100</still_compression>
+    <brightest_pixel>0</brightest_pixel>
+    <blobs>0</blobs>
+    <contours>0</contours>
+    <osc_video>0</osc_video>
+    <!-- * -->
+    <osc_video_quality>3</osc_video_quality>
+    <video_color>0</video_color>
+    <contour_slices>1</contour_slices>
+    <threshold>120</threshold>
+    <sharpness>50</sharpness>
+	<contrast>0</contrast>
+	<brightness>50</brightness>
+	<iso>800</iso>
+	<exposure_mode>0</exposure_mode>
+    <exposure_compensation>0</exposure_compensation>
+	<shutter_speed>100000</shutter_speed>
+    <!-- * -->
+    <max_stream_connections>5</max_stream_connections>
+    <max_stream_bitrate>256</max_stream_bitrate>
+    <max_stream_framerate>30</max_stream_framerate>
+    <max_stream_queue>1</max_stream_queue>
+</settings>
