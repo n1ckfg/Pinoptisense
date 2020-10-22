@@ -1,4 +1,5 @@
-# Pinopticam
+# Pinoptisense
+<img src="./docs/images/logo3.png"><br>
 
 ## CV functions:
 * Blob
