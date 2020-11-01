@@ -17,19 +17,17 @@ class Locator {
   }
   
   void run() {
-    float x =   (dot1.x + dot2.x)/2;
-    float y = (dot1.y + dot2.y)/2;
-    float z = PVector.dist(dot1, dot2) * -10;
-    PVector newSample = new PVector(x, y, z);
+    float x = dot1.x;
+    float y = dot1.y;
     if (samples.size() > 1) {
       PVector lastSample = samples.get(samples.size()-1);
-      if (PVector.dist(newSample, lastSample) < maxDist) {
-        samples.add(newSample);
+      if (PVector.dist(dot1, lastSample) < maxDist) {
+        samples.add(dot1);
       } else {
         clicked = false;
       }
     } else {
-      samples.add(newSample);
+      samples.add(dot1);
     }
     if (samples.size() > numSamples) samples.remove(0);
     

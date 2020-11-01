@@ -1,7 +1,9 @@
 import oscP5.*;
 import netP5.*;
 
-PVector dot1 = new PVector(0,0);
+int maxDots = 100;
+PVector[] dot1 = new PVector[maxDots];
+PVector[] dot2 = new PVector[maxDots];
 
 String ipNumber = "127.0.0.1";
 int sendPort = 9998;
@@ -21,7 +23,7 @@ void oscEvent(OscMessage msg) {
     int index = msg.get(2).intValue();
     float x = msg.get(3).floatValue();
     float y =  msg.get(4).floatValue();
-        
-    dot1 = new PVector(x * width, y * height);
+    
+    dot1[index] = new PVector(x * (width/2), y * height);
   }
 }

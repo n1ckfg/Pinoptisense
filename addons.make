@@ -10,3 +10,5 @@ ofxNetworkUtils
 ofxPoco
 ofxSSLManager
 ofxJSON
+ofxCrypto
+

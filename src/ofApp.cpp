@@ -14,18 +14,31 @@ void ofApp::setup() {
     camFramerate = settings.getValue("settings:cam_framerate", 30);
     ofSetFrameRate(appFramerate);
 
-    oscVideoQuality = settings.getValue("settings:osc_video_quality", 3); 
+    syncVideoQuality = settings.getValue("settings:osc_video_quality", 3); 
     videoColor = (bool) settings.getValue("settings:video_color", 0); 
     
     width = settings.getValue("settings:width", 640);
     height = settings.getValue("settings:height", 480);
     ofSetWindowShape(width, height);
 
-    host = settings.getValue("settings:host", "127.0.0.1");
+    debug = (bool) settings.getValue("settings:debug", 1);
+
+    sendOsc = (bool) settings.getValue("settings:send_osc", 1); 
+    sendWs = (bool) settings.getValue("settings:send_ws", 1); 
+    sendHttp = (bool) settings.getValue("settings:send_http", 1); 
+    sendMjpeg = (bool) settings.getValue("settings:send_mjpeg", 1); 
+    
+    syncVideo = (bool) settings.getValue("settings:sync_video", 0); 
+    blobs = (bool) settings.getValue("settings:blobs", 1);
+    contours = (bool) settings.getValue("settings:contours", 0); 
+    contourSlices = settings.getValue("settings:contour_slices", 10); 
+    brightestPixel = (bool) settings.getValue("settings:brightest_pixel", 0); 
+
     oscHost = settings.getValue("settings:osc_host", "127.0.0.1");
     oscPort = settings.getValue("settings:osc_port", 7110);
     streamPort = settings.getValue("settings:stream_port", 7111);
     wsPort = settings.getValue("settings:ws_port", 7112);
+    postPort = settings.getValue("settings:post_port", 7113);
 
     debug = (bool) settings.getValue("settings:debug", 1);
     rpiCamVersion = settings.getValue("settings:rpi_cam_version", 1);
@@ -58,90 +71,98 @@ void ofApp::setup() {
     //cam.setFrameRate // not implemented in ofxCvPiCam
     
     // ~ ~ ~   get a persistent name for this computer   ~ ~ ~
-    compname = "RPi";
-    file.open(ofToDataPath("compname.txt"), ofFile::ReadWrite, false);
+    // a randomly generated id
+    uniqueId = "RPi";
+    file.open(ofToDataPath("unique_id.txt"), ofFile::ReadWrite, false);
     ofBuffer buff;
     if (file) { // use existing file if it's there
         buff = file.readToBuffer();
-        compname = buff.getText();
+        uniqueId = buff.getText();
     } else { // otherwise make a new one
-        compname += "_" + ofGetTimestampString("%y%m%d%H%M%S%i");
-        ofStringReplace(compname, "\n", "");
-        ofStringReplace(compname, "\r", "");
-        buff.set(compname.c_str(), compname.size());
-        ofBufferToFile("compname.txt", buff);
+        uniqueId += "_" + ofGetTimestampString("%y%m%d%H%M%S%i");
+        ofStringReplace(uniqueId, "\n", "");
+        ofStringReplace(uniqueId, "\r", "");
+        buff.set(uniqueId.c_str(), uniqueId.size());
+        ofBufferToFile("unique_id.txt", buff);
     }
    
-    // * stream video *
-    // https://github.com/bakercp/ofxHTTP/blob/master/libs/ofxHTTP/include/ofx/HTTP/IPVideoRoute.h
-    // https://github.com/bakercp/ofxHTTP/blob/master/libs/ofxHTTP/src/IPVideoRoute.cpp
-    streamSettings.setPort(streamPort);
-    streamSettings.ipVideoRouteSettings.setMaxClientConnections(settings.getValue("settings:max_stream_connections", 5)); // default 5
-    streamSettings.ipVideoRouteSettings.setMaxClientBitRate(settings.getValue("settings:max_stream_bitrate", 512)); // default 1024
-    streamSettings.ipVideoRouteSettings.setMaxClientFrameRate(settings.getValue("settings:max_stream_framerate", 30)); // default 30
-    streamSettings.ipVideoRouteSettings.setMaxClientQueueSize(settings.getValue("settings:max_stream_queue", 10)); // default 10
-    streamSettings.ipVideoRouteSettings.setMaxStreamWidth(width); // default 1920
-    streamSettings.ipVideoRouteSettings.setMaxStreamHeight(height); // default 1080
-    streamSettings.fileSystemRouteSettings.setDefaultIndex("live_view.html");
-    streamServer.setup(streamSettings);
-    streamServer.start();
-
+    // the actual RPi hostname
+    ofSystem("cp /etc/hostname " + ofToDataPath("DocumentRoot/js/"));
+    hostName = ofSystem("cat /etc/hostname");
+    hostName.pop_back(); // last char is \n
+    
     fbo.allocate(width, height, GL_RGBA);
     pixels.allocate(width, height, OF_IMAGE_COLOR);
-
-    ofSystem("cp /etc/hostname " + ofToDataPath("DocumentRoot/js/"));
-    host = ofSystem("cat /etc/hostname");
-    host.pop_back(); // last char is \n
-
-    // * websockets *
-    // https://github.com/bakercp/ofxHTTP/blob/master/libs/ofxHTTP/include/ofx/HTTP/WebSocketConnection.h
-    // https://github.com/bakercp/ofxHTTP/blob/master/libs/ofxHTTP/src/WebSocketConnection.cpp
-    wsSettings.setPort(wsPort);
-    wsServer.setup(wsSettings);
-    wsServer.webSocketRoute().registerWebSocketEvents(this);
-    wsServer.start();
-
-    // events: connect, open, close, idle, message, broadcast
-    
+        
     thresholdValue = settings.getValue("settings:threshold", 127); 
-    
-    debug = (bool) settings.getValue("settings:debug", 1);
-    oscVideo = (bool) settings.getValue("settings:osc_video", 0); 
-    blobs = (bool) settings.getValue("settings:blobs", 1);
-    contours = (bool) settings.getValue("settings:contours", 0); 
-    contourSlices = settings.getValue("settings:contour_slices", 10); 
-    brightestPixel = (bool) settings.getValue("settings:brightest_pixel", 0); 
-
     contourThreshold = 2.0;
     contourMinAreaRadius = 1.0;
-    contourMaxAreaRadius = 250.0;
-
-    sender.setup(oscHost, oscPort);
-
+    contourMaxAreaRadius = 250.0;   
     contourFinder.setMinAreaRadius(contourMinAreaRadius);
     contourFinder.setMaxAreaRadius(contourMaxAreaRadius);
     //contourFinder.setInvert(true); // find black instead of white
     trackingColorMode = TRACK_COLOR_RGB;
+
+    if (sendMjpeg) {
+        // * stream video *
+        // https://github.com/bakercp/ofxHTTP/blob/master/libs/ofxHTTP/include/ofx/HTTP/IPVideoRoute.h
+        // https://github.com/bakercp/ofxHTTP/blob/master/libs/ofxHTTP/src/IPVideoRoute.cpp
+        streamSettings.setPort(streamPort);
+        streamSettings.ipVideoRouteSettings.setMaxClientConnections(settings.getValue("settings:max_stream_connections", 5)); // default 5
+        streamSettings.ipVideoRouteSettings.setMaxClientBitRate(settings.getValue("settings:max_stream_bitrate", 512)); // default 1024
+        streamSettings.ipVideoRouteSettings.setMaxClientFrameRate(settings.getValue("settings:max_stream_framerate", 30)); // default 30
+        streamSettings.ipVideoRouteSettings.setMaxClientQueueSize(settings.getValue("settings:max_stream_queue", 10)); // default 10
+        streamSettings.ipVideoRouteSettings.setMaxStreamWidth(width); // default 1920
+        streamSettings.ipVideoRouteSettings.setMaxStreamHeight(height); // default 1080
+        streamSettings.fileSystemRouteSettings.setDefaultIndex("live_view.html");
+        streamServer.setup(streamSettings);
+        streamServer.start();
+        cout << "Using MJPEG stream." << endl;
+    }
+
+    if (sendHttp) {
+        // * post form *
+        // https://bakercp.github.io/ofxHTTP/classofx_1_1_h_t_t_p_1_1_simple_post_server_settings.html
+        // https://github.com/bakercp/ofxHTTP/blob/master/libs/ofxHTTP/src/PostRoute.cpp
+        postSettings.setPort(postPort);
+        postSettings.postRouteSettings.setUploadRedirect("result.html");
+        postServer.setup(postSettings);
+        postServer.postRoute().registerPostEvents(this);
+        postServer.start();
+        cout << "Using HTTP server." << endl;
+    }
+        
+    if (sendWs) {
+        // * websockets *
+        // https://github.com/bakercp/ofxHTTP/blob/master/libs/ofxHTTP/include/ofx/HTTP/WebSocketConnection.h
+        // https://github.com/bakercp/ofxHTTP/blob/master/libs/ofxHTTP/src/WebSocketConnection.cpp
+        // events: connect, open, close, idle, message, broadcast
+        wsSettings.setPort(wsPort);
+        wsServer.setup(wsSettings);
+        wsServer.webSocketRoute().registerWebSocketEvents(this);
+        wsServer.start();
+        cout << "Using websockets." << endl;
+    }
+    
+    if (sendOsc) {
+        sender.setup(oscHost, oscPort);
+        cout << "Using OSC." << endl;
+    }
 }
 
 //--------------------------------------------------------------
 void ofApp::update() {
-     frame = cam.grab();
+    timestamp = (int) ofGetSystemTimeMillis();
+    
+    frame = cam.grab();
 
     if (!frame.empty()) {
         toOf(frame, gray.getPixelsRef());
 
-        /*
-        fbo.begin();
-        gray.draw(0,0);
-        fbo.end();
+        if (sendMjpeg) streamServer.send(gray.getPixels());
         
-        fbo.readToPixels(pixels);
-        */
-        streamServer.send(gray.getPixels());
-        
-        if (oscVideo) {
-            switch(oscVideoQuality) {
+        if (syncVideo) {
+            switch(syncVideoQuality) {
                 case 5:
                     ofSaveImage(gray, videoBuffer, OF_IMAGE_FORMAT_JPEG, OF_IMAGE_QUALITY_BEST);
                     break;
@@ -175,8 +196,9 @@ void ofApp::draw() {
             }
         }
 
-        if (oscVideo) {
-            sendOscVideo();
+        if (syncVideo) {
+            if (sendOsc) sendOscVideo();
+            if (sendWs) sendWsVideo();
         } 
 
         if (blobs) {
@@ -200,7 +222,8 @@ void ofApp::draw() {
                 	ofDrawCircle(circleCenter, 1);
                 }
 
-                sendOscBlobs(i, circleCenter.x, circleCenter.y);
+                if (sendOsc) sendOscBlobs(i, circleCenter.x, circleCenter.y);
+                if (sendWs) sendWsBlobs(i, circleCenter.x, circleCenter.y);
             }
         }
 
@@ -245,7 +268,8 @@ void ofApp::draw() {
                     std::string pointsString(pPoints, pPoints + sizeof pointsData);
                     contourPointsBuffer.set(pointsString); 
 
-                    sendOscContours(contourCounter);
+                    if (sendOsc) sendOscContours(contourCounter);
+                    if (sendWs) sendWsContours(contourCounter);
                     contourCounter++;
                 }        
             }
@@ -277,35 +301,66 @@ void ofApp::draw() {
             	ofDrawCircle(circleCenter, 40);
             }
 
-            sendOscPixel(maxBrightnessX, maxBrightnessY);
+            if (sendOsc) sendOscPixel(maxBrightnessX, maxBrightnessY);
+            if (sendWs) sendWsPixel(maxBrightnessX, maxBrightnessY);
         }
     }
 
     if (debug) {
         stringstream info;
-        info << "FPS: " << ofGetFrameRate() << "\n";
-        //info << "Camera Resolution: " << cam.width << "x" << cam.height << " @ "<< "xx" <<"FPS"<< "\n";
+        info << cam.width << "x" << cam.height << " @ "<< ofGetFrameRate() <<"fps"<< "\n";
         ofDrawBitmapStringHighlight(info.str(), 10, 10, ofColor::black, ofColor::yellow);
     }
 }
 
-// ~ ~ ~ CAM ~ ~ ~
-//void ofApp::onTakePhotoComplete(string fileName) {
-    //ofLog() << "onTakePhotoComplete fileName: " << fileName;  
+// ~ ~ ~ POST ~ ~ ~
+void ofApp::onHTTPPostEvent(ofxHTTP::PostEventArgs& args) {
+    ofLogNotice("ofApp::onHTTPPostEvent") << "Data: " << args.getBuffer().getText();
 
-    //endTakePhoto(fileName);
-//}
+    takePhoto();
+}
+
+
+void ofApp::onHTTPFormEvent(ofxHTTP::PostFormEventArgs& args) {
+    ofLogNotice("ofApp::onHTTPFormEvent") << "";
+    ofxHTTP::HTTPUtils::dumpNameValueCollection(args.getForm(), ofGetLogLevel());
+    
+    takePhoto();
+}
+
+
+void ofApp::onHTTPUploadEvent(ofxHTTP::PostUploadEventArgs& args) {
+    std::string stateString = "";
+
+    switch (args.getState()) {
+        case ofxHTTP::PostUploadEventArgs::UPLOAD_STARTING:
+            stateString = "STARTING";
+            break;
+        case ofxHTTP::PostUploadEventArgs::UPLOAD_PROGRESS:
+            stateString = "PROGRESS";
+            break;
+        case ofxHTTP::PostUploadEventArgs::UPLOAD_FINISHED:
+            stateString = "FINISHED";
+            break;
+    }
+
+    ofLogNotice("ofApp::onHTTPUploadEvent") << "";
+    ofLogNotice("ofApp::onHTTPUploadEvent") << "         state: " << stateString;
+    ofLogNotice("ofApp::onHTTPUploadEvent") << " formFieldName: " << args.getFormFieldName();
+    ofLogNotice("ofApp::onHTTPUploadEvent") << "orig. filename: " << args.getOriginalFilename();
+    ofLogNotice("ofApp::onHTTPUploadEvent") <<  "     filename: " << args.getFilename();
+    ofLogNotice("ofApp::onHTTPUploadEvent") <<  "     fileType: " << args.getFileType().toString();
+    ofLogNotice("ofApp::onHTTPUploadEvent") << "# bytes xfer'd: " << args.getNumBytesTransferred();
+}
 
 // ~ ~ ~ WEBSOCKETS ~ ~ ~
 void ofApp::onWebSocketOpenEvent(ofxHTTP::WebSocketEventArgs& evt) {
     cout << "Websocket connection opened." << endl;// << evt.getConnectionRef().getClientAddress().toString() << endl;
 }
 
-
 void ofApp::onWebSocketCloseEvent(ofxHTTP::WebSocketCloseEventArgs& evt) {
     cout << "Websocket connection closed." << endl; //<< evt.getConnectionRef().getClientAddress().toString() << endl;
 }
-
 
 void ofApp::onWebSocketFrameReceivedEvent(ofxHTTP::WebSocketFrameEventArgs& evt) {
     cout << "Websocket frame was received:" << endl; // << evt.getConnectionRef().getClientAddress().toString() << endl;
@@ -313,29 +368,9 @@ void ofApp::onWebSocketFrameReceivedEvent(ofxHTTP::WebSocketFrameEventArgs& evt)
     cout <<  msg << endl;
 
     if (msg == "take_photo") {
-        beginTakePhoto();
+        takePhoto();
     }
-    /*
-    ofxJSONElement json;
-
-    if (json.parse(evt.getFrameRef().getText())) {
-        //std::cout << json.toStyledString() << std::endl;
-
-        if (json.isMember("command") && json["command"] == "SET_BACKGROUND_COLOR") {
-            if (json["data"] == "white") {
-                //bgColor = ofColor::white;
-            } else if (json["data"] == "black") {
-                //bgColor = ofColor::black;
-            } else {
-                //cout << "Unknown color: " << json["data"].toStyledString() << endl;
-            }
-        }
-    } else {
-        //ofLogError("ofApp::onWebSocketFrameReceivedEvent") << "Unable to parse JSON: "  << evt.getFrameRef().getText();
-    }
-    */
 }
-
 
 void ofApp::onWebSocketFrameSentEvent(ofxHTTP::WebSocketFrameEventArgs& evt) {
     cout << "Websocket frame was sent." << endl;
@@ -364,7 +399,7 @@ void ofApp::createResultHtml(string fileName) {
         string lastFile = ofFilePath::getFileName(fileName);
 
         //lastPhotoTakenName = ofFilePath::getFileName(fileName);
-        lastPhotoTakenName = host + "_" + lastFile;
+        lastPhotoTakenName = hostName + "_" + lastFile;
         ofSystem("mv " + ofToDataPath("DocumentRoot/photos/" + lastFile) + " " + ofToDataPath("DocumentRoot/photos/" + lastPhotoTakenName));
         
         photoIndex += "<a href=\"photos/" + lastPhotoTakenName + "\">" + lastPhotoTakenName + "</a>\n";
@@ -376,24 +411,25 @@ void ofApp::createResultHtml(string fileName) {
     ofBufferToFile(photoIndexFileName, buff);
 }
 
-void ofApp::beginTakePhoto() {
-    //cam.takePhoto();
-    createResultHtml("none");
-}
-
-void ofApp::endTakePhoto(string fileName) {
+void ofApp::takePhoto() {
+    ofSaveImage(gray, photoBuffer, OF_IMAGE_FORMAT_JPEG, OF_IMAGE_QUALITY_BEST);
+    string fileName = "photo_" + ofToString(timestamp) + ".jpg";
+    ofBufferToFile(ofToDataPath("DocumentRoot/photos/") + fileName, photoBuffer);
     createResultHtml(fileName);
 
-    string msg = host + "," + lastPhotoTakenName;
+    string msg = "{\"unique_id\":" + uniqueId + ",\"hostname\":" + hostName + ",\"photo\":" + ofxCrypto::base64_encode(photoBuffer) + ",\"timestamp\":" + ofToString(timestamp) + "}";
     wsServer.webSocketRoute().broadcast(ofxHTTP::WebSocketFrame(msg));
 }
 
+// ~ ~ ~ OSC ~ ~ ~
 void ofApp::sendOscVideo() {
     ofxOscMessage m;
     m.setAddress("/video");
-    m.addStringArg(compname);    
-    
+
+    m.addStringArg(hostName);    
+    m.addStringArg(uniqueId);    
     m.addBlobArg(videoBuffer);
+    m.addIntArg(timestamp);
     
     sender.sendMessage(m);
 }
@@ -401,11 +437,13 @@ void ofApp::sendOscVideo() {
 void ofApp::sendOscBlobs(int index, float x, float y) {
     ofxOscMessage m;
     m.setAddress("/blob");
-    m.addStringArg(compname);
-    
-    m.addIntArg(index);
+
+    m.addStringArg(hostName);   
+    m.addStringArg(uniqueId);
+    m.addIntArg(index);  
     m.addFloatArg(x / (float) width);
     m.addFloatArg(y / (float) height);
+    m.addIntArg(timestamp);
 
     sender.sendMessage(m);
 }
@@ -413,11 +451,13 @@ void ofApp::sendOscBlobs(int index, float x, float y) {
 void ofApp::sendOscContours(int index) {
     ofxOscMessage m;
     m.setAddress("/contour");
-    m.addStringArg(compname);
     
+    m.addStringArg(hostName);
+    m.addStringArg(uniqueId);
     m.addIntArg(index);
     m.addBlobArg(contourColorBuffer);
     m.addBlobArg(contourPointsBuffer);
+    m.addIntArg(timestamp);
 
     sender.sendMessage(m);
 }
@@ -425,10 +465,40 @@ void ofApp::sendOscContours(int index) {
 void ofApp::sendOscPixel(float x, float y) {
     ofxOscMessage m;
     m.setAddress("/pixel");
-    m.addStringArg(compname);
-    
+
+    m.addStringArg(hostName);   
+    m.addStringArg(uniqueId);   
     m.addFloatArg(x / (float) width);
     m.addFloatArg(y / (float) height);
-
+    m.addIntArg(timestamp);
+    
     sender.sendMessage(m);
+}
+
+// ~ ~ ~ ~ ~ 
+
+void ofApp::sendWsVideo() { 
+    string msg = "{\"unique_id\":" + uniqueId + ",\"hostname\":" + hostName + ",\"video\":" + ofxCrypto::base64_encode(videoBuffer) + ",\"timestamp\":" + ofToString(timestamp) + "}";
+    wsServer.webSocketRoute().broadcast(ofxHTTP::WebSocketFrame(msg));
+}
+
+void ofApp::sendWsBlobs(int index, float x, float y) {   
+    float xPos = x / (float) width;
+    float yPos = y / (float) height;
+    
+    string msg = "{\"unique_id\":" + uniqueId + ",\"hostname\":" + hostName + ",\"index\":" + ofToString(index) + ",\"x\":" + ofToString(xPos) + ",\"y\":" + ofToString(yPos) + ",\"timestamp\":" + ofToString(timestamp) + "}";
+    wsServer.webSocketRoute().broadcast(ofxHTTP::WebSocketFrame(msg));
+}
+
+void ofApp::sendWsContours(int index) {
+    string msg = "{\"unique_id\":" + uniqueId + ",\"hostname\":" + hostName + ",\"index\":" + ofToString(index) + ",\"colors\":" + ofxCrypto::base64_encode(contourColorBuffer) + ",\"points\":" + ofxCrypto::base64_encode(contourPointsBuffer) + ",\"timestamp\":" + ofToString(timestamp) + "}";
+    wsServer.webSocketRoute().broadcast(ofxHTTP::WebSocketFrame(msg));
+}
+
+void ofApp::sendWsPixel(float x, float y) {   
+    float xPos = x / (float) width;
+    float yPos = y / (float) height;
+
+    string msg = "{\"unique_id\":" + uniqueId + ",\"hostname\":" + hostName + ",\"x\":" + ofToString(xPos) + ",\"y\":" + ofToString(yPos) + ",\"timestamp\":" + ofToString(timestamp) + "}";
+    wsServer.webSocketRoute().broadcast(ofxHTTP::WebSocketFrame(msg));
 }

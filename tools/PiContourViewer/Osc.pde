@@ -3,8 +3,6 @@ import netP5.*;
 
 PVector dot1 = new PVector(0,0);
 PVector dot2 = new PVector(0,0);
-ArrayList<String> hostList;
-int numHosts = 2;
 
 String ipNumber = "127.0.0.1";
 int sendPort = 9998;
@@ -19,16 +17,15 @@ void oscSetup() {
   op.setDatagramSize(datagramSize);
   oscP5 = new OscP5(this, op);
   myRemoteLocation = new NetAddress(ipNumber, sendPort);
-  hostList = new ArrayList<String>();
 }
 
 // Receive message example
 void oscEvent(OscMessage msg) {
-  if (msg.checkAddrPattern("/contour") && msg.checkTypetag("sibb")) {    
-    String hostname = msg.get(0).stringValue();
-    int index = msg.get(1).intValue();
-    byte[] readColorBytes = msg.get(2).blobValue();
-    byte[] readPointsBytes = msg.get(3).blobValue();
+  println(msg);
+  if (msg.checkAddrPattern("/contour") && msg.checkTypetag("ssibbi")) {    
+    int index = msg.get(2).intValue();
+    byte[] readColorBytes = msg.get(3).blobValue();
+    byte[] readPointsBytes = msg.get(4).blobValue();
    
     byte[] bytesR = { readColorBytes[0], readColorBytes[1], readColorBytes[2], readColorBytes[3] };
     byte[] bytesG = { readColorBytes[4], readColorBytes[5], readColorBytes[6], readColorBytes[7] };
@@ -86,18 +83,6 @@ void oscEvent(OscMessage msg) {
       if (time > s.timestamp + s.lifespan) {
         strokesBuffer.remove(i);
       }
-    }
-    
-    println(hostname + " " + " " + index);
-    
-    if (hostList.size() >= numHosts) {
-      if (hostname.equals(hostList.get(0))) {
-        //dot1 = new PVector(x * width, y * height);
-      } else {
-        //dot2 = new PVector(x * width, y * height);
-      }
-    } else {
-      hostList.add(hostname);
     }
   }
 }

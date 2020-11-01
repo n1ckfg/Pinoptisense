@@ -25,8 +25,6 @@ void draw() {
   noStroke();
   fill(255,50,0.127);
   ellipse(dot1.x, dot1.y, 20, 20);
-  fill(0,127,255,127);
-  ellipse(dot2.x, dot2.y, 20, 20);
   
   loc.run();
   

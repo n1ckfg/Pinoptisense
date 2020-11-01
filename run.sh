@@ -1,4 +1,4 @@
 # requires xvfb
 # sudo apt-get install xvfb
-
-xvfb-run ./bin/Pinopticam
+git pull
+xvfb-run -a ./bin/Pinopticam
