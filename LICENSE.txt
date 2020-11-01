@@ -1,4 +1,4 @@
-Pinopticam
+Pinoptisense
 Copyright (c) 2020 Nick Fox-Gieg
 https://fox-gieg.com
 

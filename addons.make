@@ -1,5 +1,4 @@
 ofxCv
-ofxCvPiCam
 ofxOpenCv
 ofxOsc
 ofxXmlSettings
@@ -11,4 +10,4 @@ ofxPoco
 ofxSSLManager
 ofxJSON
 ofxCrypto
-
+ofxRealSense2

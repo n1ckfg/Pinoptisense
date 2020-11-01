@@ -1,4 +1,4 @@
-# Pinopticam
+# Pinoptisense
 <img src="./docs/images/logo3.png"><br>
 
 ## Image operations:
