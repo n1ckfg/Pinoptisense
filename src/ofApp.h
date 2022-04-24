@@ -2,12 +2,12 @@
 
 #include "ofMain.h"
 #include "ofxCv.h"
-#include "ofxCvPiCam.h"
 #include "ofxOsc.h"
 #include "ofxXmlSettings.h"
 #include "ofxHTTP.h"
 #include "ofxJSONElement.h"
 #include "ofxCrypto.h"
+#include "ofxRealSense2.h"
 
 #define NUM_MESSAGES 30 // how many past ws messages we want to keep
 
@@ -15,6 +15,7 @@ class ofApp : public ofBaseApp {
 
     public:	
 	void setup();
+	void exit();
 	void update();
 	void draw();
 		
@@ -73,7 +74,20 @@ class ofApp : public ofBaseApp {
 	ofBuffer contourColorBuffer;
 	ofBuffer contourPointsBuffer;
 
-	ofxCvPiCam cam;
+// ~ ~ ~ REALSENSE ~ ~ ~
+	void deviceAdded(std::string& serialNumber);
+
+	ofxRealSense2::Context rsContext;
+	std::shared_ptr<ofxRealSense2::Device> rsDevice;
+
+	int fps, alignment;
+	bool overUnder, vsyncEnabled;
+	int x1, y1, x2, y2, widthScaled, heightScaled;
+	float windowScale;
+	bool pointsEnabled, emitterEnabled, infraredEnabled;
+	bool holeFilling, spatialNoiseReduction, temporalNoiseReduction;
+// ~ ~ ~ ~ ~ ~
+
 	cv::Mat frame, frameProcessed;
 	ofImage gray;
 	int syncVideoQuality; // 5 best to 1 worst, default 3 medium

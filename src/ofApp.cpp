@@ -19,7 +19,7 @@ void ofApp::setup() {
     
     width = settings.getValue("settings:width", 640);
     height = settings.getValue("settings:height", 480);
-    ofSetWindowShape(width, height);
+    ofSetWindowShape(720, 480);
 
     debug = (bool) settings.getValue("settings:debug", 1);
 
@@ -44,6 +44,17 @@ void ofApp::setup() {
     rpiCamVersion = settings.getValue("settings:rpi_cam_version", 1);
     stillCompression = settings.getValue("settings:still_compression", 100);
 
+    vsyncEnabled = (bool) settings.getValue("settings:vsync_enabled", 1);
+    overUnder = (bool) settings.getValue("settings:over_under", 0); // 0 sbs, 1 ou
+    windowScale = settings.getValue("settings:window_scale", 1.0);
+    alignment = settings.getValue("settings:alignment", 2); // 0 none, 1 depth, 2 color
+    infraredEnabled = (bool) settings.getValue("settings:infrared_enabled", 0);
+    pointsEnabled = (bool) settings.getValue("settings:points_enabled", 0);
+    emitterEnabled = (bool) settings.getValue("settings:emitter_enabled", 1);
+    holeFilling = (bool) settings.getValue("settings:hole_filling", 0);
+    spatialNoiseReduction = (bool) settings.getValue("settings:spatial_noise_reduction", 0);
+    temporalNoiseReduction = (bool) settings.getValue("settings:temporal_noise_reduction", 0);
+    
     // camera
     if (videoColor) {
         gray.allocate(width, height, OF_IMAGE_COLOR);
@@ -51,6 +62,7 @@ void ofApp::setup() {
         gray.allocate(width, height, OF_IMAGE_GRAYSCALE);        
     }
     
+    /*
     cam.setup(width, height, camFramerate, videoColor); // color/gray;
 
     camSharpness = settings.getValue("settings:sharpness", 0); 
@@ -69,6 +81,7 @@ void ofApp::setup() {
     cam.setExposureCompensation(camExposureCompensation);
     cam.setShutterSpeed(camShutterSpeed);
     //cam.setFrameRate // not implemented in ofxCvPiCam
+    */
     
     // ~ ~ ~   get a persistent name for this computer   ~ ~ ~
     // a randomly generated id
@@ -103,6 +116,33 @@ void ofApp::setup() {
     //contourFinder.setInvert(true); // find black instead of white
     trackingColorMode = TRACK_COLOR_RGB;
 
+    ofDisableArbTex();
+    ofAddListener(rsContext.deviceAddedEvent, this, &ofApp::deviceAdded);
+    ofSetVerticalSync(vsyncEnabled);
+    
+    widthScaled = 360; //width * windowScale;
+    heightScaled = 480; //height * windowScale;
+    
+    if (overUnder) {
+        ofSetWindowShape(widthScaled, heightScaled * 2);
+        x1 = 0;
+        y1 = 0;
+        x2 = 0;
+        y2 = heightScaled;
+    } else {
+        ofSetWindowShape(widthScaled * 2, heightScaled);
+        x1 = widthScaled;
+        y1 = 0;
+        x2 = 0;
+        y2 = 0;
+    }
+    
+    try {
+        rsContext.setup(false);
+    } catch (std::exception& e) {
+        ofLogFatalError(__FUNCTION__) << e.what();
+    }
+    
     if (sendMjpeg) {
         // * stream video *
         // https://github.com/bakercp/ofxHTTP/blob/master/libs/ofxHTTP/include/ofx/HTTP/IPVideoRoute.h
@@ -150,11 +190,40 @@ void ofApp::setup() {
     }
 }
 
+void ofApp::deviceAdded(std::string& serialNumber) {
+    ofLogNotice(__FUNCTION__) << "Starting device " << serialNumber;
+    
+    rsDevice = rsContext.getDevice(serialNumber);
+    
+    // device methods go before pipeline
+    rsDevice->enableDepth(width, height, fps);
+    if (infraredEnabled) {
+        rsDevice->enableInfrared(width, height, fps);
+    } else {
+        rsDevice->enableColor(width, height, fps);
+    }
+    if (pointsEnabled) rsDevice->enablePoints();
+
+    rsDevice->startPipeline();
+
+    // device switches go after pipeline
+    rsDevice->emitterEnabled = emitterEnabled;
+    rsDevice->holeFillingEnabled = holeFilling;
+    rsDevice->temporalFilterEnabled = temporalNoiseReduction;
+    rsDevice->spatialFilterEnabled = spatialNoiseReduction;
+    rsDevice->alignMode = alignment;
+}
+
+void ofApp::exit() {
+    rsContext.clear();
+}
+
 //--------------------------------------------------------------
 void ofApp::update() {
     timestamp = (int) ofGetSystemTimeMillis();
     
-    frame = cam.grab();
+    //frame = cam.grab();
+    rsContext.update();
 
     if (!frame.empty()) {
         toOf(frame, gray.getPixelsRef());
@@ -187,6 +256,15 @@ void ofApp::update() {
 void ofApp::draw() {
     ofBackground(0);
 
+    if (rsDevice) {
+        if (infraredEnabled) {
+            rsDevice->getInfraredTex().draw(x1, y1, widthScaled, heightScaled);
+        } else {
+            rsDevice->getColorTex().draw(x1, y1, widthScaled, heightScaled);
+        }
+        rsDevice->getDepthTex().draw(x2, y2, widthScaled, heightScaled);
+    }
+    
     if(!frame.empty()) {
         if (debug) {
             if (!blobs && !contours) {
@@ -308,7 +386,7 @@ void ofApp::draw() {
 
     if (debug) {
         stringstream info;
-        info << cam.width << "x" << cam.height << " @ "<< ofGetFrameRate() <<"fps"<< "\n";
+        //info << cam.width << "x" << cam.height << " @ "<< ofGetFrameRate() <<"fps"<< "\n";
         ofDrawBitmapStringHighlight(info.str(), 10, 10, ofColor::black, ofColor::yellow);
     }
 }
