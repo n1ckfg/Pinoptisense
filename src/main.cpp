@@ -15,16 +15,17 @@ int main() {
 	settings.windowMode = OF_FULLSCREEN;
 	ofCreateWindow(settings);
 #else
-        ofGLFWWindowSettings settings;
-        settings.numSamples = 0;
+    ofGLFWWindowSettings settings;
+	settings.setGLVersion(3, 2);
+    settings.numSamples = 0;
 	settings.setSize(w, h);
 	settings.windowMode = OF_FULLSCREEN;
-        ofCreateWindow(settings);                       
+    ofCreateWindow(settings);                       
 #endif
 
-        // this kicks off the running of my app
-        // can be OF_WINDOW or OF_FULLSCREEN
-        // pass in width and height too:
-        ofRunApp( new ofApp());
+    // this kicks off the running of my app
+    // can be OF_WINDOW or OF_FULLSCREEN
+    // pass in width and height too:
+    ofRunApp(new ofApp());
 
 }

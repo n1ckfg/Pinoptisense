@@ -7,21 +7,21 @@
     <post_port>7113</post_port>
     <!-- * -->
     <app_framerate>60</app_framerate>
-    <cam_framerate>40</cam_framerate>
-    <width>640</width>
+    <cam_framerate>30</cam_framerate>
+    <width>720</width>
     <height>480</height>
     <debug>0</debug>
     <!-- * -->
     <rpi_cam_version>2</rpi_cam_version>
     <still_compression>100</still_compression>
     <!-- * -->
-    <send_osc>1</send_osc>
+    <send_osc>0</send_osc>
     <send_ws>0</send_ws>
-    <send_mjpeg>0</send_mjpeg>
+    <send_mjpeg>1</send_mjpeg>
     <send_http>0</send_http>
     <!-- * -->
     <brightest_pixel>0</brightest_pixel>
-    <blobs>1</blobs>
+    <blobs>0</blobs>
     <contours>0</contours>
     <sync_video>0</sync_video>
     <!-- * -->
