@@ -4,7 +4,7 @@
 //========================================================================
 int main() {
 	
-	int w = 720;
+	int w = 640;
 	int h = 480;
 	
 	// setup the GL context
@@ -12,14 +12,14 @@ int main() {
 	ofGLESWindowSettings settings;
 	settings.glesVersion = 2;
 	settings.setSize(w, h);
-	settings.windowMode = OF_FULLSCREEN;
+	//settings.windowMode = OF_FULLSCREEN;
 	ofCreateWindow(settings);
 #else
     ofGLFWWindowSettings settings;
 	settings.setGLVersion(3, 2);
     settings.numSamples = 0;
 	settings.setSize(w, h);
-	settings.windowMode = OF_FULLSCREEN;
+	//settings.windowMode = OF_FULLSCREEN;
     ofCreateWindow(settings);                       
 #endif
 

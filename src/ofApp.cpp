@@ -19,7 +19,7 @@ void ofApp::setup() {
     
     width = settings.getValue("settings:width", 640);
     height = settings.getValue("settings:height", 480);
-    ofSetWindowShape(720, 480);
+    ofSetWindowShape(width, height);
 
     debug = (bool) settings.getValue("settings:debug", 1);
 
@@ -120,8 +120,8 @@ void ofApp::setup() {
     ofAddListener(rsContext.deviceAddedEvent, this, &ofApp::deviceAdded);
     ofSetVerticalSync(vsyncEnabled);
     
-    widthScaled = 360; //width * windowScale;
-    heightScaled = 480; //height * windowScale;
+    widthScaled = width / 2;
+    heightScaled = height;
     
     if (overUnder) {
         ofSetWindowShape(widthScaled, heightScaled * 2);
@@ -225,10 +225,25 @@ void ofApp::update() {
     //frame = cam.grab();
     rsContext.update();
 
-    if (!frame.empty()) {
-        toOf(frame, gray.getPixelsRef());
+    //if (!frame.empty()) {
+		fbo.begin();
+		if (rsDevice) {
+			if (infraredEnabled) {
+				rsDevice->getInfraredTex().draw(x1, y1, widthScaled, heightScaled);
+			} else {
+				rsDevice->getColorTex().draw(x1, y1, widthScaled, heightScaled);
+			}
+			rsDevice->getDepthTex().draw(x2, y2, widthScaled, heightScaled);
+		}
+		fbo.end();
+		
+		fbo.readToPixels(pixels);
 
-        if (sendMjpeg) streamServer.send(gray.getPixels());
+        if (sendMjpeg) streamServer.send(pixels);
+		
+		gray.setFromPixels(pixels);
+		
+		//toCv(gray, frame);	
         
         if (syncVideo) {
             switch(syncVideoQuality) {
@@ -249,22 +264,16 @@ void ofApp::update() {
                     break;
             }
        	}
-    }
+    //}
 }
 
 //--------------------------------------------------------------
 void ofApp::draw() {
     ofBackground(0);
-
-    if (rsDevice) {
-        if (infraredEnabled) {
-            rsDevice->getInfraredTex().draw(x1, y1, widthScaled, heightScaled);
-        } else {
-            rsDevice->getColorTex().draw(x1, y1, widthScaled, heightScaled);
-        }
-        rsDevice->getDepthTex().draw(x2, y2, widthScaled, heightScaled);
-    }
-    
+   
+    fbo.draw(0,0);
+   
+    /*
     if(!frame.empty()) {
         if (debug) {
             if (!blobs && !contours) {
@@ -383,7 +392,8 @@ void ofApp::draw() {
             if (sendWs) sendWsPixel(maxBrightnessX, maxBrightnessY);
         }
     }
-
+	*/
+	
     if (debug) {
         stringstream info;
         //info << cam.width << "x" << cam.height << " @ "<< ofGetFrameRate() <<"fps"<< "\n";
