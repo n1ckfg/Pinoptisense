@@ -55,6 +55,10 @@ void ofApp::setup() {
     spatialNoiseReduction = (bool) settings.getValue("settings:spatial_noise_reduction", 0);
     temporalNoiseReduction = (bool) settings.getValue("settings:temporal_noise_reduction", 0);
     
+    depthTex.allocate(width, height, GL_RGBA);
+    colorTex.allocate(width, height, GL_RGBA);
+    irTex.allocate(width, height, GL_RGBA);
+    
     // camera
     if (videoColor) {
         gray.allocate(width, height, OF_IMAGE_COLOR);
@@ -226,24 +230,38 @@ void ofApp::update() {
     rsContext.update();
 
     //if (!frame.empty()) {
-		fbo.begin();
-		if (rsDevice) {
-			if (infraredEnabled) {
-				rsDevice->getInfraredTex().draw(x1, y1, widthScaled, heightScaled);
-			} else {
-				rsDevice->getColorTex().draw(x1, y1, widthScaled, heightScaled);
-			}
-			rsDevice->getDepthTex().draw(x2, y2, widthScaled, heightScaled);
-		}
-		fbo.end();
-		
-		fbo.readToPixels(pixels);
+    if (rsDevice) {
+        if (infraredEnabled) {
+            irTex = rsDevice->getInfraredTex();
+        } else {
+            colorTex = rsDevice->getColorTex();
+        }
+        depthTex = rsDevice->getDepthTex();
+    }
+}
+
+void ofApp::draw() {
+    ofBackground(0);
+
+    if (rsDevice) {
+        fbo.begin();
+        if (infraredEnabled) {
+            irTex.draw(x1, y1, widthScaled, heightScaled);
+        } else {
+            colorTex.draw(x1, y1, widthScaled, heightScaled);
+        }
+        depthTex.draw(x2, y2, widthScaled, heightScaled);
+        fbo.end();       
+      
+        fbo.draw(0,0);
+            
+        fbo.readToPixels(pixels);
 
         if (sendMjpeg) streamServer.send(pixels);
-		
-		gray.setFromPixels(pixels);
-		
-		//toCv(gray, frame);	
+        
+        gray.setFromPixels(pixels);
+        
+        //toCv(gray, frame);	
         
         if (syncVideo) {
             switch(syncVideoQuality) {
@@ -263,15 +281,15 @@ void ofApp::update() {
                     ofSaveImage(gray, videoBuffer, OF_IMAGE_FORMAT_JPEG, OF_IMAGE_QUALITY_WORST);
                     break;
             }
-       	}
-    //}
-}
+        }
+    }
+
 
 //--------------------------------------------------------------
-void ofApp::draw() {
-    ofBackground(0);
+//void ofApp::draw() {
+    //ofBackground(0);
    
-    fbo.draw(0,0);
+    //fbo.draw(0,0);
    
     /*
     if(!frame.empty()) {

@@ -27,6 +27,8 @@ class ofApp : public ofBaseApp {
 
 	bool debug; // draw to local screen, default true
 
+	ofTexture depthTex, colorTex, irTex;
+
 	ofFile file;
 	ofxXmlSettings settings;
 
